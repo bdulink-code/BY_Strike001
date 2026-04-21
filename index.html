@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>BYStrike Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div class="phone-frame">
+      <div class="statusbar">
+        <span>BYStrike Demo</span>
+        <span id="clock">12:00</span>
+      </div>
+
+      <main id="screen" class="screen menu-screen active">
+        <div class="bg-grid"></div>
+        <div class="brand-wrap">
+          <div class="eyebrow">Investor Demo / Mobile Web Prototype</div>
+          <h1 class="brand-title"><span>BY</span>STRIKE</h1>
+          <p class="brand-subtitle">AR tactical shooter concept. Lobby, countdown, combat HUD, lock-on, hits and results.</p>
+        </div>
+
+        <section class="card hero-card">
+          <label class="label">Позывной</label>
+          <input id="callsignInput" class="input" value="GHOST_01" maxlength="16" />
+          <div class="button-row stack">
+            <button class="primary" id="hostBtn">Создать матч</button>
+            <button class="secondary" id="joinBtn">Войти в демо</button>
+          </div>
+        </section>
+
+        <section class="card info-card">
+          <div class="chip-row">
+            <span class="chip">2 команды</span>
+            <span class="chip">AR HUD</span>
+            <span class="chip">Lock-on</span>
+            <span class="chip">Investor Ready</span>
+          </div>
+          <p>
+            Это не нативный Xcode-проект, а мобильная демо-версия для GitHub Pages. Её можно открыть на любом телефоне по ссылке и показывать инвесторам без MacBook.
+          </p>
+        </section>
+      </main>
+
+      <section id="lobbyScreen" class="screen lobby-screen hidden">
+        <div class="header-line">
+          <button class="ghost" data-back="menu">←</button>
+          <div>
+            <div class="section-kicker">Комната</div>
+            <h2>Лобби</h2>
+          </div>
+          <div class="room-code">A3F7</div>
+        </div>
+
+        <div class="card">
+          <div class="players-list" id="playersList"></div>
+        </div>
+
+        <div class="card">
+          <div class="chip-row">
+            <span class="chip">Mode: Team Strike</span>
+            <span class="chip">Map: Factory Yard</span>
+            <span class="chip">Respawn: 5s</span>
+          </div>
+          <button class="primary full" id="startMatchBtn">Начать матч</button>
+        </div>
+      </section>
+
+      <section id="countdownScreen" class="screen countdown-screen hidden">
+        <div class="countdown-backdrop"></div>
+        <div class="countdown-text" id="countdownText">3</div>
+        <div class="countdown-label">Подготовка к запуску матча</div>
+      </section>
+
+      <section id="battleScreen" class="screen battle-screen hidden">
+        <div class="battle-bg"></div>
+        <div class="scanlines"></div>
+        <div class="hud-top">
+          <div class="hud-pill">HP <strong id="hpValue">100</strong></div>
+          <div class="hud-pill">Ammo <strong id="ammoValue">30/120</strong></div>
+          <div class="hud-pill timer">03:00</div>
+        </div>
+
+        <div class="minimap">
+          <div class="mini-player"></div>
+          <div class="mini-dot enemy" style="top:20%;left:68%"></div>
+          <div class="mini-dot enemy" style="top:38%;left:80%"></div>
+          <div class="mini-dot ally" style="top:62%;left:28%"></div>
+        </div>
+
+        <div id="targetLayer" class="target-layer"></div>
+
+        <div class="crosshair-wrap">
+          <div id="lockRing" class="lock-ring"></div>
+          <div id="crosshair" class="crosshair neutral">
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div id="lockText" class="lock-text">ПОИСК ЦЕЛИ</div>
+        </div>
+
+        <div class="killfeed card translucent">
+          <div class="feed-title">События</div>
+          <div id="feedItems" class="feed-items"></div>
+        </div>
+
+        <div class="weapon-wrap">
+          <div class="muzzle" id="muzzleFlash"></div>
+          <div class="weapon-body"></div>
+          <div class="weapon-stock"></div>
+          <div class="weapon-mag"></div>
+        </div>
+
+        <div class="battle-controls">
+          <div class="battle-actions">
+            <button class="secondary small" id="prevTargetBtn">◀ Цель</button>
+            <button class="secondary small" id="nextTargetBtn">Цель ▶</button>
+            <button class="secondary small" id="damageBtn">Получить урон</button>
+          </div>
+          <div class="battle-actions">
+            <button class="secondary small" id="reloadBtn">Перезарядка</button>
+            <button class="danger fire" id="fireBtn">ОГОНЬ</button>
+          </div>
+          <div class="helper-note">Зелёный = союзник. Красный = враг. Белый = цели нет.</div>
+        </div>
+      </section>
+
+      <section id="resultsScreen" class="screen results-screen hidden">
+        <div class="header-line center">
+          <div>
+            <div class="section-kicker">Матч завершён</div>
+            <h2>Победа команды A</h2>
+          </div>
+        </div>
+        <div class="card results-card">
+          <div class="trophy">🏆</div>
+          <div class="results-list" id="resultsList"></div>
+        </div>
+        <div class="button-row stack sticky-bottom">
+          <button class="primary" id="restartBtn">Повторить демо</button>
+          <button class="secondary" id="backToMenuBtn">Вернуться в меню</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
