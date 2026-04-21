@@ -6,6 +6,9 @@ const state = {
   currentTargetIndex: 0,
   currentScreen: 'menu',
   countdownTimer: null,
+  matchTimer: null,
+  matchSeconds: 180,
+  cameraStream: null,
   players: [
     { name: 'GHOST_01', role: 'Host', team: 'A', score: '7 / 2' },
     { name: 'SHADOW', role: 'Scout', team: 'A', score: '4 / 3' },
@@ -102,6 +105,11 @@ function renderFeed() {
   });
 }
 
+function pushFeed(message) {
+  state.feed.push(message);
+  renderFeed();
+}
+
 function updateCombatView() {
   renderTargets();
   renderFeed();
@@ -128,139 +136,262 @@ function updateCombatView() {
   } else {
     crosshair.classList.add(target.hp < 100 ? 'enemy-lock' : 'loading');
     lockRing.style.setProperty('--progress', target.hp < 100 ? 100 : 62);
-    lockText.textContent = target.hp < 100 ? `ЗАХВАТ: ${target.name}` : `ЗАХВАТ... ${target.name}`;
+    lockText.textContent = target.hp < 100 ? `ЦЕЛЬ ЗАХВАЧЕНА: ${target.name}` : `ЗАХВАТ ЦЕЛИ: ${target.name}`;
   }
 }
 
-function startCountdown() {
-  switchScreen('countdown');
-  const values = ['3', '2', '1', 'GO'];
-  let i = 0;
-  ids('countdownText').textContent = values[i];
-  state.countdownTimer = setInterval(() => {
-    i += 1;
-    if (i >= values.length) {
-      clearInterval(state.countdownTimer);
-      switchScreen('battle');
-      updateCombatView();
-      state.feed.push('SYSTEM: Combat live');
-      renderFeed();
-      return;
-    }
-    ids('countdownText').textContent = values[i];
-  }, 850);
-}
-
-function fireWeapon() {
-  const target = state.targets[state.currentTargetIndex];
-  if (!target) return;
-  if (state.ammo <= 0) {
-    state.feed.push('WARN: Magazine empty');
-    renderFeed();
-    return;
-  }
-  if (target.type === 'ally') {
-    state.feed.push(`SAFE: fire blocked on ally ${target.name}`);
-    renderFeed();
-    return;
-  }
-
-  state.ammo -= 1;
-  target.hp = Math.max(0, target.hp - 50);
-  ids('muzzleFlash').classList.remove('active');
-  void ids('muzzleFlash').offsetWidth;
-  ids('muzzleFlash').classList.add('active');
-
-  if (target.hp === 0) {
-    state.feed.push(`${state.callsign} ▶ ${target.name} eliminated`);
-    target.hp = 100;
-    const enemyPlayers = state.players.filter(p => p.name === target.name);
-    if (enemyPlayers[0]) {
-      const kd = enemyPlayers[0].score.split('/').map(v => parseInt(v.trim(), 10));
-      enemyPlayers[0].score = `${kd[0]} / ${kd[1] + 1}`;
-    }
-  } else {
-    state.feed.push(`${state.callsign} hit ${target.name} for 50`);
-  }
-  updateCombatView();
-}
-
-function reloadWeapon() {
-  const need = 30 - state.ammo;
-  const used = Math.min(need, state.reserve);
-  state.ammo += used;
-  state.reserve -= used;
-  state.feed.push('Weapon reloaded');
-  updateCombatView();
-}
-
-function takeDamage() {
-  state.hp = Math.max(0, state.hp - 25);
-  state.feed.push('Incoming hit: -25 HP');
-  updateCombatView();
-  if (state.hp === 0) {
-    setTimeout(showResults, 700);
-  }
-}
-
-function showResults() {
-  switchScreen('results');
-  const results = [
-    { place: 1, name: state.callsign, meta: 'Team A · MVP', score: '7 / 2' },
-    { place: 2, name: 'SHADOW', meta: 'Team A · Scout', score: '4 / 3' },
-    { place: 3, name: 'HUNTER', meta: 'Team B · Assault', score: '5 / 5' },
-    { place: 4, name: 'VIPER', meta: 'Team B · Sniper', score: '3 / 4' }
+function renderResults() {
+  const list = ids('resultsList');
+  const data = [
+    { place: '1', name: state.callsign, meta: 'Team A · MVP', score: '7 / 2' },
+    { place: '2', name: 'SHADOW', meta: 'Team A · Scout', score: '4 / 3' },
+    { place: '3', name: 'HUNTER', meta: 'Team B · Assault', score: '5 / 5' },
+    { place: '4', name: 'VIPER', meta: 'Team B · Sniper', score: '3 / 4' }
   ];
-  ids('resultsList').innerHTML = results.map(r => `
+  list.innerHTML = data.map(item => `
     <div class="result-row">
-      <div class="place">#${r.place}</div>
+      <div class="place">#${item.place}</div>
       <div>
-        <div><strong>${r.name}</strong></div>
-        <div class="meta">${r.meta}</div>
+        <div><strong>${item.name}</strong></div>
+        <div class="meta">${item.meta}</div>
       </div>
-      <div class="chip">${r.score}</div>
+      <div class="chip">${item.score}</div>
     </div>
   `).join('');
 }
 
-function resetDemo() {
+async function requestCamera() {
+  const video = ids('cameraFeed');
+  const fallback = ids('cameraFallback');
+  const fallbackText = ids('fallbackText');
+
+  fallback.classList.add('hidden');
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    fallbackText.textContent = 'Этот браузер не поддерживает открытие камеры через getUserMedia.';
+    fallback.classList.remove('hidden');
+    return false;
+  }
+
+  try {
+    if (state.cameraStream) {
+      state.cameraStream.getTracks().forEach(track => track.stop());
+      state.cameraStream = null;
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      },
+      audio: false
+    });
+
+    state.cameraStream = stream;
+    video.srcObject = stream;
+    await video.play();
+    return true;
+  } catch (error) {
+    let message = 'Не удалось открыть камеру. Разреши доступ в браузере и перезапусти демо.';
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+      message = 'Камера в большинстве браузеров открывается только по HTTPS. Для показа загрузи проект на GitHub Pages.';
+    } else if (error && error.name === 'NotAllowedError') {
+      message = 'Доступ к камере отклонён. Разреши камеру для сайта в настройках браузера.';
+    } else if (error && error.name === 'NotFoundError') {
+      message = 'Камера на устройстве не найдена.';
+    }
+    fallbackText.textContent = message;
+    fallback.classList.remove('hidden');
+    return false;
+  }
+}
+
+function stopCamera() {
+  if (state.cameraStream) {
+    state.cameraStream.getTracks().forEach(track => track.stop());
+    state.cameraStream = null;
+  }
+  const video = ids('cameraFeed');
+  video.pause();
+  video.srcObject = null;
+}
+
+function startCountdown() {
+  switchScreen('countdown');
+  const sequence = ['3', '2', '1', 'GO'];
+  let index = 0;
+  ids('countdownText').textContent = sequence[index];
+  ids('countdownLabel').textContent = 'Подготовка к запуску матча';
+
+  clearInterval(state.countdownTimer);
+  state.countdownTimer = setInterval(async () => {
+    index += 1;
+    if (index < sequence.length) {
+      ids('countdownText').textContent = sequence[index];
+      if (sequence[index] === 'GO') ids('countdownLabel').textContent = 'Камера активна';
+      return;
+    }
+
+    clearInterval(state.countdownTimer);
+    switchScreen('battle');
+    updateCombatView();
+    const started = await requestCamera();
+    if (started) {
+      pushFeed('CAM: rear camera connected');
+    }
+    startMatchTimer();
+  }, 900);
+}
+
+function startMatchTimer() {
+  clearInterval(state.matchTimer);
+  state.matchSeconds = 180;
+  updateTimerLabel();
+  state.matchTimer = setInterval(() => {
+    state.matchSeconds -= 1;
+    updateTimerLabel();
+    if (state.matchSeconds <= 0) {
+      clearInterval(state.matchTimer);
+      finishMatch();
+    }
+  }, 1000);
+}
+
+function updateTimerLabel() {
+  const min = String(Math.floor(state.matchSeconds / 60)).padStart(2, '0');
+  const sec = String(state.matchSeconds % 60).padStart(2, '0');
+  ids('timerValue').textContent = `${min}:${sec}`;
+}
+
+function cycleTarget(direction = 1) {
+  state.currentTargetIndex = (state.currentTargetIndex + direction + state.targets.length) % state.targets.length;
+  updateCombatView();
+}
+
+function fireShot() {
+  if (state.ammo <= 0) {
+    pushFeed('WEAPON: magazine empty');
+    return;
+  }
+
+  const target = state.targets[state.currentTargetIndex];
+  state.ammo -= 1;
+  ids('ammoValue').textContent = `${state.ammo}/${state.reserve}`;
+  const muzzle = ids('muzzleFlash');
+  muzzle.classList.remove('active');
+  void muzzle.offsetWidth;
+  muzzle.classList.add('active');
+
+  if (target.type === 'ally') {
+    pushFeed(`SAFELOCK: ${target.name} is friendly`);
+    updateCombatView();
+    return;
+  }
+
+  target.hp = Math.max(0, target.hp - 50);
+  if (target.hp === 0) {
+    pushFeed(`KILL: ${state.callsign} ▶ ${target.name}`);
+    target.hp = 100;
+    state.currentTargetIndex = (state.currentTargetIndex + 1) % state.targets.length;
+  } else {
+    pushFeed(`HIT: ${target.name} -50 HP`);
+  }
+  updateCombatView();
+}
+
+function takeDamage() {
+  state.hp = Math.max(0, state.hp - 18);
+  ids('hpValue').textContent = state.hp;
+  pushFeed(`DAMAGE: ${state.callsign} -18 HP`);
+  document.body.classList.add('hit-flash');
+  setTimeout(() => document.body.classList.remove('hit-flash'), 220);
+
+  if (state.hp === 0) {
+    finishMatch();
+  }
+}
+
+function reloadWeapon() {
+  if (state.reserve <= 0 || state.ammo === 30) {
+    pushFeed('WEAPON: reload not needed');
+    return;
+  }
+  const needed = 30 - state.ammo;
+  const amount = Math.min(needed, state.reserve);
+  state.ammo += amount;
+  state.reserve -= amount;
+  ids('ammoValue').textContent = `${state.ammo}/${state.reserve}`;
+  pushFeed('WEAPON: reload complete');
+}
+
+function finishMatch() {
+  clearInterval(state.matchTimer);
+  stopCamera();
+  renderResults();
+  switchScreen('results');
+}
+
+function resetState() {
+  state.callsign = ids('callsignInput').value.trim() || 'GHOST_01';
+  state.players[0].name = state.callsign;
   state.hp = 100;
   state.ammo = 30;
   state.reserve = 120;
-  state.currentTargetIndex = 0;
+  state.currentTargetIndex = 1;
+  state.feed = [
+    'SYSTEM: Match initialized',
+    'AR: 3 targets detected',
+    'NET: lobby sync OK'
+  ];
   state.targets = [
     { id: 1, name: 'SHADOW', type: 'ally', hp: 100, x: 18, y: 42, scale: 0.82 },
     { id: 2, name: 'HUNTER', type: 'enemy', hp: 100, x: 58, y: 31, scale: 1.02 },
     { id: 3, name: 'VIPER', type: 'enemy', hp: 100, x: 74, y: 48, scale: 0.88 }
   ];
-  state.feed = ['SYSTEM: Match initialized', 'AR: 3 targets detected', 'NET: lobby sync OK'];
   renderPlayers();
-  updateCombatView();
-  switchScreen('menu');
+  renderFeed();
 }
 
-ids('callsignInput').addEventListener('input', e => {
-  state.callsign = e.target.value || 'GHOST_01';
-  state.players[0].name = state.callsign;
-  renderPlayers();
+ids('hostBtn').addEventListener('click', () => {
+  resetState();
+  switchScreen('lobby');
 });
-ids('hostBtn').addEventListener('click', () => { renderPlayers(); switchScreen('lobby'); });
-ids('joinBtn').addEventListener('click', () => { renderPlayers(); switchScreen('lobby'); });
-ids('startMatchBtn').addEventListener('click', startCountdown);
-ids('prevTargetBtn').addEventListener('click', () => {
-  state.currentTargetIndex = (state.currentTargetIndex - 1 + state.targets.length) % state.targets.length;
-  updateCombatView();
+ids('joinBtn').addEventListener('click', () => {
+  resetState();
+  switchScreen('lobby');
 });
-ids('nextTargetBtn').addEventListener('click', () => {
-  state.currentTargetIndex = (state.currentTargetIndex + 1) % state.targets.length;
-  updateCombatView();
+ids('startMatchBtn').addEventListener('click', async () => {
+  resetState();
+  startCountdown();
 });
-ids('fireBtn').addEventListener('click', fireWeapon);
-ids('reloadBtn').addEventListener('click', reloadWeapon);
+ids('prevTargetBtn').addEventListener('click', () => cycleTarget(-1));
+ids('nextTargetBtn').addEventListener('click', () => cycleTarget(1));
+ids('fireBtn').addEventListener('click', fireShot);
 ids('damageBtn').addEventListener('click', takeDamage);
-ids('restartBtn').addEventListener('click', () => { resetDemo(); renderPlayers(); switchScreen('lobby'); });
-ids('backToMenuBtn').addEventListener('click', resetDemo);
-document.querySelectorAll('[data-back="menu"]').forEach(btn => btn.addEventListener('click', () => switchScreen('menu')));
+ids('reloadBtn').addEventListener('click', reloadWeapon);
+ids('restartBtn').addEventListener('click', () => {
+  resetState();
+  switchScreen('lobby');
+});
+ids('backToMenuBtn').addEventListener('click', () => {
+  clearInterval(state.matchTimer);
+  stopCamera();
+  switchScreen('menu');
+});
+ids('retryCameraBtn').addEventListener('click', requestCamera);
+
+document.querySelectorAll('[data-back="menu"]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    clearInterval(state.matchTimer);
+    stopCamera();
+    switchScreen('menu');
+  });
+});
+
+window.addEventListener('beforeunload', stopCamera);
 
 renderPlayers();
+renderFeed();
+renderResults();
 updateCombatView();

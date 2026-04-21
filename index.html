@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>BYStrike Demo</title>
+  <title>BYStrike AR Demo</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -13,16 +13,16 @@
   <div class="app-shell">
     <div class="phone-frame">
       <div class="statusbar">
-        <span>BYStrike Demo</span>
+        <span>BYStrike AR Demo</span>
         <span id="clock">12:00</span>
       </div>
 
       <main id="screen" class="screen menu-screen active">
         <div class="bg-grid"></div>
         <div class="brand-wrap">
-          <div class="eyebrow">Investor Demo / Mobile Web Prototype</div>
+          <div class="eyebrow">Investor Demo / Camera HUD Prototype</div>
           <h1 class="brand-title"><span>BY</span>STRIKE</h1>
-          <p class="brand-subtitle">AR tactical shooter concept. Lobby, countdown, combat HUD, lock-on, hits and results.</p>
+          <p class="brand-subtitle">Запуск через камеру телефона. После старта матч открывает живое изображение с камеры и накладывает игровой интерфейс шутера поверх видео.</p>
         </div>
 
         <section class="card hero-card">
@@ -36,13 +36,13 @@
 
         <section class="card info-card">
           <div class="chip-row">
-            <span class="chip">2 команды</span>
+            <span class="chip">Камера</span>
             <span class="chip">AR HUD</span>
             <span class="chip">Lock-on</span>
-            <span class="chip">Investor Ready</span>
+            <span class="chip">GitHub Pages</span>
           </div>
           <p>
-            Это не нативный Xcode-проект, а мобильная демо-версия для GitHub Pages. Её можно открыть на любом телефоне по ссылке и показывать инвесторам без MacBook.
+            Для инвесторов это выглядит как игровой прототип: камера телефона открывается по разрешению браузера, а поверх неё накладывается интерфейс прицела, цели, урон, выстрелы и результаты матча.
           </p>
         </section>
       </main>
@@ -64,26 +64,37 @@
         <div class="card">
           <div class="chip-row">
             <span class="chip">Mode: Team Strike</span>
-            <span class="chip">Map: Factory Yard</span>
+            <span class="chip">Map: Live Camera</span>
             <span class="chip">Respawn: 5s</span>
           </div>
-          <button class="primary full" id="startMatchBtn">Начать матч</button>
+          <button class="primary full" id="startMatchBtn">Стартовать матч</button>
         </div>
       </section>
 
       <section id="countdownScreen" class="screen countdown-screen hidden">
         <div class="countdown-backdrop"></div>
         <div class="countdown-text" id="countdownText">3</div>
-        <div class="countdown-label">Подготовка к запуску матча</div>
+        <div class="countdown-label" id="countdownLabel">Подготовка к запуску матча</div>
       </section>
 
       <section id="battleScreen" class="screen battle-screen hidden">
-        <div class="battle-bg"></div>
+        <video id="cameraFeed" class="camera-feed" autoplay playsinline muted></video>
+        <div class="camera-fallback hidden" id="cameraFallback">
+          <div class="fallback-card card">
+            <h3>Камера не открылась</h3>
+            <p id="fallbackText">Разреши доступ к камере в браузере и открой страницу по HTTPS, например через GitHub Pages.</p>
+            <button class="primary" id="retryCameraBtn">Повторить запрос</button>
+          </div>
+        </div>
+
+        <div class="camera-mask"></div>
         <div class="scanlines"></div>
+        <div class="battle-vignette"></div>
+
         <div class="hud-top">
           <div class="hud-pill">HP <strong id="hpValue">100</strong></div>
           <div class="hud-pill">Ammo <strong id="ammoValue">30/120</strong></div>
-          <div class="hud-pill timer">03:00</div>
+          <div class="hud-pill timer" id="timerValue">03:00</div>
         </div>
 
         <div class="minimap">
@@ -92,6 +103,8 @@
           <div class="mini-dot enemy" style="top:38%;left:80%"></div>
           <div class="mini-dot ally" style="top:62%;left:28%"></div>
         </div>
+
+        <div class="mode-badge">LIVE CAMERA HUD</div>
 
         <div id="targetLayer" class="target-layer"></div>
 
@@ -125,7 +138,7 @@
             <button class="secondary small" id="reloadBtn">Перезарядка</button>
             <button class="danger fire" id="fireBtn">ОГОНЬ</button>
           </div>
-          <div class="helper-note">Зелёный = союзник. Красный = враг. Белый = цели нет.</div>
+          <div class="helper-note">После нажатия «Стартовать матч» браузер сам запросит камеру. Для показа инвесторам лучше открыть ссылку с телефона через GitHub Pages.</div>
         </div>
       </section>
 
